@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recipe App</title>
+  <link rel="icon" type="image/icon"
+    href="https://img.freepik.com/premium-vector/chefs-culinary-creations-monochromatic-excellence-gourmet-delights-black-white-chefs-art_706143-18635.jpg?ga=GA1.1.1639133888.1710839055&semt=ais_hybrid">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    h1 {
+      text-align: center;
+      margin: 20px;
+    }
+
+    .search-bar {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      text-align: center;
+      margin: 20px 0;
+    }
+
+    input {
+      padding: 10px;
+      width: 300px;
+      border: none;
+      border-radius: 5px;
+      background: transparent;
+      box-shadow: 0px 0px 6px 0px darkslategray;
+      outline: none;
+    }
+
+    button {
+      padding: 10px 15px;
+      cursor: pointer;
+      box-shadow: 0px 1px 15px 2px darkslategray;
+      background: transparent;
+      color: black;
+      border: none;
+      border-radius: 5px;
+    }
+
+    #search-btn {
+      padding: 10px 15px;
+      cursor: pointer;
+      box-shadow: 0px 0px 6px 0px darkslategray;
+      background: transparent;
+      color: black;
+      border: none;
+      border-radius: 5px;
+    }
+
+    .recipes,
+    .favorites {
+      margin-top: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 15px;
+    }
+
+    .recipe-card {
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 15px;
+      width: 250px;
+      text-align: center;
+      background-color: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      color: black;
+    }
+
+    .recipe-card img {
+      width: 100%;
+      border-radius: 5px;
+    }
+
+    .recipe-card button {
+      margin-top: 10px;
+    }
+
+    .heart-container {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      z-index: 999;
+    }
+
+    .heart-icon {
+      font-size: 24px;
+      color: red;
+    }
+
+    .favorites-count {
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    #favorites-section {
+      display: none;
+      text-align: center;
+    }
+
+    .back-btn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      box-shadow: 0px 1px 15px 2px darkslategray;
+      background: transparent;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(45deg, #ff9a9e, #fad0c4, #fbc2eb, #a18cd1, #f093fb, #ff9a9e);
+      background-size: 300% 300%;
+      z-index: -1;
+      animation: gradientMove 8s ease infinite;
+    }
+
+    @keyframes gradientMove {
+      0% {
+        background-position: 0% 50%;
+      }
+
+      50% {
+        background-position: 100% 50%;
+      }
+
+      100% {
+        background-position: 0% 50%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Recipe App</h1>
+
+  <div class="heart-container" onclick="toggleFavoritesView()">
+    <span class="heart-icon">❤️</span>
+    <span id="favorites-count" class="favorites-count">0</span>
+  </div>
+
+  <div id="search-section">
+    <div class="search-bar">
+      <input type="text" id="search-input" placeholder="Search for recipes..." />
+      <button id="search-btn">Search</button>
+    </div>
+    <div id="recipes" class="recipes"></div>
+  </div>
+
+  <div id="favorites-section">
+    <h2>Favorites</h2>
+    <div id="favorites" class="favorites"></div>
+    <button class="back-btn" onclick="goBackToSearch()">Go Back</button>
+  </div>
+
+  <script>
+    const API_URL = "https://www.themealdb.com/api/json/v1/1/search.php?s=";
+
+    const searchInput = document.getElementById("search-input");
+    const searchBtn = document.getElementById("search-btn");
+    const recipesContainer = document.getElementById("recipes");
+    const favoritesContainer = document.getElementById("favorites");
+    const favoritesCount = document.getElementById("favorites-count");
+    const searchSection = document.getElementById("search-section");
+    const favoritesSection = document.getElementById("favorites-section");
+
+    let favorites = JSON.parse(localStorage.getItem("favorites")) || [];
+    updateFavoritesCount();
+
+    function fetchRecipes(query) {
+      return fetch(API_URL + query)
+        .then((response) => {
+          if (!response.ok) throw new Error("Failed to fetch recipes!");
+          return response.json();
+        })
+        .then((data) => data.meals);
+    }
+
+    function fetchRandomRecipes(count = 5) {
+      const randomRecipePromises = Array.from({ length: count }, () =>
+        fetch("https://www.themealdb.com/api/json/v1/1/random.php")
+          .then((response) => {
+            if (!response.ok) throw new Error("Failed to fetch random recipes!");
+            return response.json();
+          })
+          .then((data) => data.meals[0])
+      );
+
+      return Promise.all(randomRecipePromises);
+    }
+
+    function renderRecipes(recipes) {
+      recipesContainer.innerHTML = recipes
+        ? recipes
+          .map(
+            (recipe) => `
+          <div class="recipe-card">
+            <img src="${recipe.strMealThumb}" alt="${recipe.strMeal}" />
+            <h3>${recipe.strMeal}</h3>
+            <button onclick="addToFavorites('${recipe.idMeal}', '${recipe.strMeal}', '${recipe.strMealThumb}')">Add to Favorites</button>
+          </div>
+        `
+          )
+          .join("")
+        : "<p>No recipes found. Try a different search!</p>";
+    }
+
+    function renderFavorites() {
+      favoritesContainer.innerHTML = favorites.length
+        ? favorites
+          .map(
+            (fav) => `
+          <div class="recipe-card">
+            <img src="${fav.thumb}" alt="${fav.name}" />
+            <h3>${fav.name}</h3>
+            <button onclick="removeFromFavorites('${fav.id}')">Remove</button>
+          </div>
+        `
+          )
+          .join("")
+        : "<p>No favorites yet. Add some recipes!</p>";
+    }
+
+    function addToFavorites(id, name, thumb) {
+      if (favorites.some((fav) => fav.id === id)) {
+        alert("Recipe already in favorites!");
+        return;
+      }
+
+      favorites.push({ id, name, thumb });
+      localStorage.setItem("favorites", JSON.stringify(favorites));
+      updateFavoritesCount();
+    }
+
+    function removeFromFavorites(id) {
+      favorites = favorites.filter((fav) => fav.id !== id);
+      localStorage.setItem("favorites", JSON.stringify(favorites));
+      updateFavoritesCount();
+      renderFavorites();
+    }
+
+    function toggleFavoritesView() {
+      renderFavorites();
+      favoritesSection.style.display = "block";
+      searchSection.style.display = "none";
+    }
+
+    function goBackToSearch() {
+      favoritesSection.style.display = "none";
+      searchSection.style.display = "block";
+    }
+
+    function updateFavoritesCount() {
+      favoritesCount.textContent = favorites.length;
+    }
+
+    function loadRandomRecipes() {
+      fetchRandomRecipes()
+        .then((randomRecipes) => renderRecipes(randomRecipes))
+        .catch((error) => {
+          recipesContainer.innerHTML = `<p style="color: red;">${error.message}</p>`;
+        });
+    }
+
+    searchBtn.addEventListener("click", () => {
+      const query = searchInput.value.trim();
+      if (!query) {
+        alert("Please enter a search term!");
+        return;
+      }
+
+      fetchRecipes(query)
+        .then((recipes) => renderRecipes(recipes))
+        .catch((error) => {
+          recipesContainer.innerHTML = `<p style="color: red;">${error.message}</p>`;
+        });
+    });
+
+    // Initial rendering
+    window.addEventListener("DOMContentLoaded", loadRandomRecipes);
+  </script>
+</body>
+
+</html>
